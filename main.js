@@ -1,5 +1,7 @@
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const canvas = /** @type {HTMLCanvasElement}*/ (
+  document.getElementById("game")
+);
+const ctx = /** @type {CanvasRenderingContext2D}*/ (canvas.getContext("2d"));
 
 const player = {
   x: 30,
@@ -15,8 +17,19 @@ const npc = {
   height: 32,
 };
 
+const item = {
+  x: 80,
+  y: 200,
+  width: 16,
+  height: 16,
+  collected: false,
+};
+
 let selectedOption = 0;
 let visited = [false, false];
+
+let message = "";
+let messageTimer = 0;
 
 const questions = [
   {
@@ -36,8 +49,11 @@ const questions = [
 let answerLines = [];
 let answerPage = 0;
 
-const dialogueLines = ["..."];
+let dialogueLines = ["..."];
 let dialogueIndex = 0;
+
+let storyPhase = 0; // 0:questions, 1: find bag, 3: companion
+let dialogueCallback = null;
 
 let gameState = "walking"; // "walking" | "talking"
 
@@ -49,14 +65,47 @@ window.addEventListener("keydown", (e) => {
   }
   keys[e.key] = true;
 
-  if (e.key === " " && gameState === "walking" && isNear(player, npc)) {
-    gameState = "talking";
-    dialogueIndex = 0;
+  if (e.key === " " && gameState === "walking") {
+    if (isNear(player, npc)) {
+      gameState = "talking";
+      dialogueIndex = 0;
+      if (storyPhase === 1 && !item.collected) {
+        dialogueLines = ["Did you find my bag?", "My knee really hurts..."];
+
+        dialogueCallback = () => {
+          gameState = "walking";
+        };
+        gameState = "talking";
+      } else if (storyPhase === 1 && item.collected) {
+        dialogueLines = [
+          "That's my bag! Thank you!",
+          "Let me put on this bandaid...",
+          "There! Good as new.",
+          "Want to look around together?",
+        ];
+        dialogueCallback = () => {
+          storyPhase = 3;
+          gameState = "walking";
+        };
+        gameState = "talking";
+      } else {
+        gameState = "talking";
+      }
+    } else if (!item.collected && isNear(player, item, 30)) {
+      item.collected = true;
+      message = "You found Hikarigumo's bag!";
+      messageTimer = 180; // show for 3 seconds (60 frames x 3)
+    }
   } else if (e.key === " " && gameState === "talking") {
     if (dialogueIndex < dialogueLines.length - 1) {
       dialogueIndex++;
     } else {
-      gameState = "asking";
+      if (dialogueCallback) {
+        dialogueCallback();
+        dialogueCallback = null;
+      } else {
+        gameState = "asking";
+      }
     }
   } else if (gameState === "asking") {
     if (e.key === "ArrowUp") {
@@ -65,9 +114,28 @@ window.addEventListener("keydown", (e) => {
       selectedOption = (selectedOption + 1) % 3;
     } else if (e.key === " ") {
       if (selectedOption === 2) {
-        gameState = "walking";
-        selectedOption = 0;
-        visited = [false, false];
+        if (storyPhase === 0) {
+          dialogueLines = [
+            "Ouch...",
+            "My knee hurts a little.",
+            "I have a bandaid in my bag...",
+            "Wait, where is my bag?",
+            "I must have dropped it when I fell.",
+            "Bakezaru: I'll look for it.",
+          ];
+          dialogueIndex = 0;
+          dialogueCallback = () => {
+            storyPhase = 1;
+            gameState = "walking";
+          };
+          gameState = "talking";
+          selectedOption = 0;
+          visited = [false, false];
+        } else {
+          gameState = "walking";
+          selectedOption = 0;
+          visited = [false, false];
+        }
       } else {
         visited[selectedOption] = true;
         answerLines = buildLines(questions[selectedOption].a);
@@ -97,6 +165,18 @@ function update() {
 
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
     player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+  }
+  if (messageTimer > 0) messageTimer--;
+  if (messageTimer === 0) message = "";
+
+  if (storyPhase === 3) {
+    const dx = player.x - npc.x;
+    const dy = player.y - npc.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist > 40) {
+      npc.x += dx * 0.05;
+      npc.y += dy * 0.05;
+    }
   }
 }
 
@@ -339,6 +419,41 @@ function draw() {
 
   // hikarigumo
   drawHikarigumo(npc.x, npc.y);
+
+  // Hikarigumo's bag
+  if (!item.collected) {
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(item.x, item.y, item.width, item.height);
+    ctx.fillStyle = "#DAA520";
+    ctx.fillRect(item.x + 3, item.y - 3, 10, 4);
+  }
+
+  // Hint above bag
+  if (!item.collected && gameState === "walking" && isNear(player, item, 30)) {
+    ctx.fillStyle = "black";
+    ctx.font = "12px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Press Space", item.x + item.width / 2, item.y - 8);
+    ctx.textAlign = "left";
+  }
+
+  // Pickup message
+  if (message) {
+    ctx.fillStyle = "black";
+    ctx.font = "14px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(message, canvas.width / 2, 220);
+    ctx.textAlign = "left";
+  }
+
+  // Hint when near Hikarigumo
+  if (gameState === "walking" && isNear(player, npc)) {
+    ctx.fillStyle = "Black";
+    ctx.font = "12px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Press Space", npc.x + npc.width / 2, npc.y - 10);
+    ctx.textAlign = "left";
+  }
 
   // Diplay dialogue
   if (gameState === "talking") {
