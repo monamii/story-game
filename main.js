@@ -31,6 +31,8 @@ let visited = [false, false];
 let message = "";
 let messageTimer = 0;
 
+let currentMap = 1;
+
 const questions = [
   {
     q: "Where did you from?",
@@ -165,6 +167,24 @@ function update() {
 
     player.x = Math.max(0, Math.min(canvas.width - player.width, player.x));
     player.y = Math.max(0, Math.min(canvas.height - player.height, player.y));
+
+    if (currentMap === 1 && player.x >= canvas.width - player.width) {
+      currentMap = 2;
+      player.x = 10;
+      if (storyPhase >= 3) {
+        npc.x = player.x + 10;
+        npc.y = player.y;
+      }
+    }
+    if (currentMap === 2 && player.x <= 0) {
+      currentMap = 1;
+      player.x = canvas.width - player.width - 1;
+
+      if (storyPhase >= 3) {
+        npc.x = player.x - 10;
+        npc.y = player.y;
+      }
+    }
   }
   if (messageTimer > 0) messageTimer--;
   if (messageTimer === 0) message = "";
@@ -402,57 +422,90 @@ function drawHikarigumo(x, y) {
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Beach background
-  ctx.fillStyle = "#f5deb3";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Sae at the bottom
-  ctx.fillStyle = "#60a5fa";
-  ctx.fillRect(0, 260, canvas.width, 60);
-
-  // House area at the top
-  ctx.fillStyle = "#92400e";
-  ctx.fillRect(20, 20, 60, 60);
+  if (currentMap === 1) {
+    // Forest background
+    ctx.fillStyle = "#2d5a1b";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Ground
+    ctx.fillStyle = "#4a7c3f";
+    ctx.fillRect(0, 200, canvas.width, canvas.height);
+    // House
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(40, 140, 70, 70);
+    ctx.fillStyle = "#5c2d0a";
+    ctx.beginPath();
+    ctx.moveTo(30, 140);
+    ctx.lineTo(75, 100);
+    ctx.lineTo(120, 140);
+    ctx.closePath();
+    ctx.fill();
+    // Trees
+    [
+      [180, 120],
+      [280, 100],
+      [350, 130],
+      [420, 110],
+      [60, 220],
+      [200, 230],
+    ].forEach(([tx, ty]) => {
+      ctx.fillStyle = "#1a3d0a";
+      ctx.beginPath();
+      ctx.arc(tx, ty, 28, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  } else {
+    // Beach (existing drawing)
+    ctx.fillStyle = "#f5deb3";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#60a5fa";
+    ctx.fillRect(0, 260, canvas.width, 60);
+  }
 
   // bakezaru - player
   drawBakezaru(player.x, player.y);
 
-  // hikarigumo
-  drawHikarigumo(npc.x, npc.y);
+  if (currentMap === 2 || storyPhase >= 3) {
+    // hikarigumo
+    drawHikarigumo(npc.x, npc.y);
 
-  // Hikarigumo's bag
-  if (!item.collected) {
-    ctx.fillStyle = "#8B4513";
-    ctx.fillRect(item.x, item.y, item.width, item.height);
-    ctx.fillStyle = "#DAA520";
-    ctx.fillRect(item.x + 3, item.y - 3, 10, 4);
-  }
+    // Hikarigumo's bag
+    if (!item.collected) {
+      ctx.fillStyle = "#8B4513";
+      ctx.fillRect(item.x, item.y, item.width, item.height);
+      ctx.fillStyle = "#DAA520";
+      ctx.fillRect(item.x + 3, item.y - 3, 10, 4);
+    }
 
-  // Hint above bag
-  if (!item.collected && gameState === "walking" && isNear(player, item, 30)) {
-    ctx.fillStyle = "black";
-    ctx.font = "12px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("Press Space", item.x + item.width / 2, item.y - 8);
-    ctx.textAlign = "left";
-  }
+    // Hint above bag
+    if (
+      !item.collected &&
+      gameState === "walking" &&
+      isNear(player, item, 30)
+    ) {
+      ctx.fillStyle = "black";
+      ctx.font = "12px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("Press Space", item.x + item.width / 2, item.y - 8);
+      ctx.textAlign = "left";
+    }
 
-  // Pickup message
-  if (message) {
-    ctx.fillStyle = "black";
-    ctx.font = "14px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(message, canvas.width / 2, 220);
-    ctx.textAlign = "left";
-  }
+    // Pickup message
+    if (message) {
+      ctx.fillStyle = "black";
+      ctx.font = "14px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(message, canvas.width / 2, 220);
+      ctx.textAlign = "left";
+    }
 
-  // Hint when near Hikarigumo
-  if (gameState === "walking" && isNear(player, npc)) {
-    ctx.fillStyle = "Black";
-    ctx.font = "12px monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("Press Space", npc.x + npc.width / 2, npc.y - 10);
-    ctx.textAlign = "left";
+    // Hint when near Hikarigumo
+    if (gameState === "walking" && storyPhase < 3 && isNear(player, npc)) {
+      ctx.fillStyle = "Black";
+      ctx.font = "12px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("Press Space", npc.x + npc.width / 2, npc.y - 10);
+      ctx.textAlign = "left";
+    }
   }
 
   // Diplay dialogue
