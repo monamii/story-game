@@ -1,29 +1,18 @@
+import { buildLines } from "./core/TextUtils.js";
+import { Item } from "./entities/Item.js";
+import { Npc } from "./entities/Npc.js";
+import { Player } from "./entities/Player.js";
+
 const canvas = /** @type {HTMLCanvasElement}*/ (
   document.getElementById("game")
 );
 const ctx = /** @type {CanvasRenderingContext2D}*/ (canvas.getContext("2d"));
 
-const player = {
-  x: 30,
-  y: 30,
-  width: 32,
-  height: 32,
-  speed: 3,
-};
-const npc = {
-  x: 340,
-  y: 230,
-  width: 32,
-  height: 32,
-};
+const player = new Player(30, 30);
 
-const item = {
-  x: 80,
-  y: 200,
-  width: 16,
-  height: 16,
-  collected: false,
-};
+const npc = new Npc(340, 230);
+
+const item = new Item(80, 200, 16, 16);
 
 let selectedOption = 0;
 let visited = [false, false];
@@ -35,12 +24,12 @@ let currentMap = 1;
 
 const questions = [
   {
-    q: "Where did you from?",
-    a: "I fell from the clouds. I'm trying to get back. I miss my mom and dad.",
+    q: "Who are you?",
+    a: "I am Hikarigumo. I am from the cloud people. We live where the sky turns white and soft. I have never been down here before.",
   },
   {
-    q: "Who are you?",
-    a: "I'm Hikarigumo. I'm from a town up above the cloud.I'm Hikarigumo. I'm from a town up above the cloud.I'm Hikarigumo. I'm from a town up above the cloud.",
+    q: "Where did you come from?",
+    a: "I fell from up there, past the clouds. There is a town up there — that is where I am from. I was looking over the edge and then... I need to find a way back.",
   },
   {
     q: "Goodbye.",
@@ -68,7 +57,7 @@ window.addEventListener("keydown", (e) => {
   keys[e.key] = true;
 
   if (e.key === " " && gameState === "walking") {
-    if (isNear(player, npc)) {
+    if (player.isNear(npc)) {
       gameState = "talking";
       dialogueIndex = 0;
       if (storyPhase === 1 && !item.collected) {
@@ -80,10 +69,13 @@ window.addEventListener("keydown", (e) => {
         gameState = "talking";
       } else if (storyPhase === 1 && item.collected) {
         dialogueLines = [
-          "That's my bag! Thank you!",
-          "Let me put on this bandaid...",
-          "There! Good as new.",
-          "Want to look around together?",
+          "That is it! That is my bag!",
+          "Thank you, Bakezaru.",
+          "...",
+          "Bandaid on. There.",
+          "Good as new.",
+          "Hey... do you want to walk together for a while?",
+          "I do not know where I am going. But that is okay.",
         ];
         dialogueCallback = () => {
           storyPhase = 3;
@@ -93,7 +85,7 @@ window.addEventListener("keydown", (e) => {
       } else {
         gameState = "talking";
       }
-    } else if (!item.collected && isNear(player, item, 30)) {
+    } else if (!item.collected && player.isNear(item, 30)) {
       item.collected = true;
       message = "You found Hikarigumo's bag!";
       messageTimer = 180; // show for 3 seconds (60 frames x 3)
@@ -118,12 +110,12 @@ window.addEventListener("keydown", (e) => {
       if (selectedOption === 2) {
         if (storyPhase === 0) {
           dialogueLines = [
-            "Ouch...",
-            "My knee hurts a little.",
+            "Ah...",
+            "My knee. I hurt it when I landed.",
             "I have a bandaid in my bag...",
-            "Wait, where is my bag?",
-            "I must have dropped it when I fell.",
-            "Bakezaru: I'll look for it.",
+            "...Wait. Where is my bag?",
+            "I had it when I fell. It must be somewhere on the beach.",
+            "Bakezaru: I will find it.",
           ];
           dialogueIndex = 0;
           dialogueCallback = () => {
@@ -134,13 +126,21 @@ window.addEventListener("keydown", (e) => {
           selectedOption = 0;
           visited = [false, false];
         } else {
+          dialogueLines = [
+            "You are still looking?",
+            "Take your time. I am not going anywhere like this.",
+          ];
           gameState = "walking";
           selectedOption = 0;
           visited = [false, false];
         }
       } else {
         visited[selectedOption] = true;
-        answerLines = buildLines(questions[selectedOption].a);
+        answerLines = buildLines(
+          ctx,
+          questions[selectedOption].a,
+          canvas.width - 80,
+        );
         answerPage = 0;
         gameState = "answering";
       }
@@ -198,12 +198,6 @@ function update() {
       npc.y += dy * 0.05;
     }
   }
-}
-
-function isNear(a, b, distance = 40) {
-  const dx = a.x + a.width / 2 - (b.x + b.width / 2);
-  const dy = a.y + a.height / 2 - (b.y + b.height / 2);
-  return Math.sqrt(dx * dx + dy * dy) < distance;
 }
 
 //#b5651d
@@ -477,11 +471,7 @@ function draw() {
     }
 
     // Hint above bag
-    if (
-      !item.collected &&
-      gameState === "walking" &&
-      isNear(player, item, 30)
-    ) {
+    if (!item.collected && gameState === "walking" && player.isNear(item, 30)) {
       ctx.fillStyle = "black";
       ctx.font = "12px monospace";
       ctx.textAlign = "center";
@@ -499,7 +489,7 @@ function draw() {
     }
 
     // Hint when near Hikarigumo
-    if (gameState === "walking" && storyPhase < 3 && isNear(player, npc)) {
+    if (gameState === "walking" && storyPhase < 3 && player.isNear(npc)) {
       ctx.fillStyle = "Black";
       ctx.font = "12px monospace";
       ctx.textAlign = "center";
@@ -514,7 +504,14 @@ function draw() {
     ctx.fillRect(20, 240, canvas.width - 40, 70);
     ctx.fillStyle = "white";
     ctx.font = "16px monospace";
-    ctx.fillText(dialogueLines[dialogueIndex], 35, 265);
+    const wrapped = buildLines(
+      ctx,
+      dialogueLines[dialogueIndex],
+      canvas.width - 80,
+    );
+    wrapped.forEach((line, i) => {
+      ctx.fillText(line, 35, 262 + i * 20);
+    });
   } else if (gameState === "asking") {
     ctx.fillStyle = "rgba(0,0,0,0.8)";
     ctx.fillRect(20, 240, canvas.width - 40, 70);
@@ -555,24 +552,6 @@ function draw() {
     ctx.fillText("BAG", canvas.width - 30, 56);
     ctx.textAlign = "left";
   }
-}
-
-function buildLines(text) {
-  ctx.font = "16px monospace";
-  const words = text.split(" ");
-  const lines = [];
-  let line = "";
-  for (const word of words) {
-    const text = line + word + " ";
-    if (ctx.measureText(text).width > canvas.width - 80 && line !== "") {
-      lines.push(line.trim());
-      line = word + " ";
-    } else {
-      line = text;
-    }
-  }
-  if (line.trim()) lines.push(line.trim());
-  return lines;
 }
 
 function loop() {
