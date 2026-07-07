@@ -1,8 +1,8 @@
 import { Entity } from "./Entity.js";
 
 export class Item extends Entity {
-  constructor(x, y, width, height) {
+  constructor(id, x, y, width, height) {
     super(x, y, width, height);
-    this.collected = false;
+    this.id = id;
   }
 }
