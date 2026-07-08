@@ -1,9 +1,10 @@
 import { InputManager } from "./core/InputManager.js";
 import { buildLines } from "./core/TextUtils.js";
+import { DialogueSystem } from "./dialogue/DialogueSystem.js";
 import { Item } from "./entities/Item.js";
 import { Npc } from "./entities/Npc.js";
 import { Player } from "./entities/Player.js";
-import { Inventory } from "./inventory/inventory.js";
+import { Inventory } from "./inventory/Inventory.js";
 import { Beach } from "./maps/Beach.js";
 import { Forest } from "./maps/Forest.js";
 import { drawBakezaru } from "./sprites/bakezaru.js";
@@ -20,9 +21,6 @@ const npc = new Npc(340, 230);
 
 const item = new Item("bag", 80, 200, 16, 16);
 const inventory = new Inventory();
-
-let selectedOption = 0;
-let visited = [false, false];
 
 let message = "";
 let messageTimer = 0;
@@ -44,16 +42,7 @@ const questions = [
   },
 ];
 
-let answerLines = [];
-let answerPage = 0;
-
-let dialogueLines = ["..."];
-let dialogueIndex = 0;
-
 let storyPhase = 0; // 0:questions, 1: find bag, 3: companion
-let dialogueCallback = null;
-
-let gameState = "walking"; // "walking" | "talking"
 
 const maps = {
   1: new Forest(),
@@ -61,9 +50,10 @@ const maps = {
 };
 
 const input = new InputManager();
+const dialogue = new DialogueSystem();
 
 function update() {
-  if (gameState === "walking") {
+  if (!dialogue.isActive()) {
     if (input.isDown("ArrowUp")) player.y -= player.speed;
     if (input.isDown("ArrowDown")) player.y += player.speed;
     if (input.isDown("ArrowLeft")) player.x -= player.speed;
@@ -84,103 +74,70 @@ function update() {
 
     if (input.consumePressed(" ")) {
       if (player.isNear(npc)) {
-        dialogueIndex = 0;
         if (storyPhase === 1 && !inventory.has(item.id)) {
-          dialogueLines = ["Did you find my bag?", "My knee really hurts..."];
-
-          dialogueCallback = () => {
-            gameState = "walking";
-          };
+          dialogue.startLines(
+            ["Did you find my bag?", "My knee really hurts..."],
+            null,
+          );
         } else if (storyPhase === 1 && inventory.has(item.id)) {
-          dialogueLines = [
-            "That is it! That is my bag!",
-            "Thank you, Bakezaru.",
-            "...",
-            "Bandaid on. There.",
-            "Good as new.",
-            "Hey... do you want to walk together for a while?",
-            "I do not know where I am going. But that is okay.",
-          ];
-          dialogueCallback = () => {
-            storyPhase = 3;
-            gameState = "walking";
-          };
+          dialogue.startLines(
+            [
+              "That is it! That is my bag!",
+              "Thank you, Bakezaru.",
+              "...",
+              "Bandaid on. There.",
+              "Good as new.",
+              "Hey... do you want to walk together for a while?",
+              "I do not know where I am going. But that is okay.",
+            ],
+            () => {
+              storyPhase = 3;
+            },
+          );
+        } else {
+          dialogue.startLines(["..."], () => {
+            dialogue.startMenu(questions, (i) => {
+              if (i === questions.length - 1) {
+                if (storyPhase === 0) {
+                  dialogue.startLines(
+                    [
+                      "Ah...",
+                      "My knee. I hurt it when I landed.",
+                      "I have a bandaid in my bag...",
+                      "...Wait. Where is my bag?",
+                      "I had it when I fell. It must be somewhere on the beach.",
+                      "Bakezaru: I will find it.",
+                    ],
+                    () => {
+                      storyPhase = 1;
+                    },
+                  );
+                } else {
+                  dialogue.startLines(
+                    [
+                      "You are still looking?",
+                      "Take your time. I am not going anywhere like this.",
+                    ],
+                    null,
+                  );
+                }
+              } else {
+                dialogue.showAnswer(
+                  buildLines(ctx, questions[i].a, canvas.width - 80),
+                );
+              }
+            });
+          });
         }
-        gameState = "talking";
       } else if (!inventory.has(item.id) && player.isNear(item, 30)) {
         inventory.add(item);
         message = "You found Hikarigumo's bag!";
         messageTimer = 180; // show for 3 seconds (60 frames x 3)
       }
     }
-  } else if (gameState === "talking") {
-    if (input.consumePressed(" ")) {
-      if (dialogueIndex < dialogueLines.length - 1) {
-        dialogueIndex++;
-      } else {
-        if (dialogueCallback) {
-          dialogueCallback();
-          dialogueCallback = null;
-        } else {
-          gameState = "asking";
-        }
-      }
-    }
-  } else if (gameState === "asking") {
-    if (input.consumePressed("ArrowUp")) {
-      selectedOption = (selectedOption + 2) % 3;
-    } else if (input.consumePressed("ArrowDown")) {
-      selectedOption = (selectedOption + 1) % 3;
-    } else if (input.consumePressed(" ")) {
-      if (selectedOption === 2) {
-        if (storyPhase === 0) {
-          dialogueLines = [
-            "Ah...",
-            "My knee. I hurt it when I landed.",
-            "I have a bandaid in my bag...",
-            "...Wait. Where is my bag?",
-            "I had it when I fell. It must be somewhere on the beach.",
-            "Bakezaru: I will find it.",
-          ];
-          dialogueIndex = 0;
-          dialogueCallback = () => {
-            storyPhase = 1;
-            gameState = "walking";
-          };
-          gameState = "talking";
-          selectedOption = 0;
-          visited = [false, false];
-        } else {
-          dialogueLines = [
-            "You are still looking?",
-            "Take your time. I am not going anywhere like this.",
-          ];
-          dialogueIndex = 0;
-          gameState = "walking";
-          selectedOption = 0;
-          visited = [false, false];
-        }
-      } else {
-        visited[selectedOption] = true;
-        answerLines = buildLines(
-          ctx,
-          questions[selectedOption].a,
-          canvas.width - 80,
-        );
-        answerPage = 0;
-        gameState = "answering";
-      }
-    }
-  } else if (gameState === "answering") {
-    if (input.consumePressed(" ")) {
-      const totalPages = Math.ceil(answerLines.length / 2);
-      if (answerPage < totalPages - 1) {
-        answerPage++;
-      } else {
-        gameState = "asking";
-      }
-    }
   }
+
+  dialogue.handleInput(input);
 
   if (messageTimer > 0) messageTimer--;
   if (messageTimer === 0) message = "";
@@ -219,7 +176,7 @@ function draw() {
     // Hint above bag
     if (
       !inventory.has(item.id) &&
-      gameState === "walking" &&
+      !dialogue.isActive() &&
       player.isNear(item, 30)
     ) {
       ctx.fillStyle = "black";
@@ -239,7 +196,7 @@ function draw() {
     }
 
     // Hint when near Hikarigumo
-    if (gameState === "walking" && storyPhase < 3 && player.isNear(npc)) {
+    if (!dialogue.isActive() && storyPhase < 3 && player.isNear(npc)) {
       ctx.fillStyle = "Black";
       ctx.font = "12px monospace";
       ctx.textAlign = "center";
@@ -249,38 +206,7 @@ function draw() {
   }
 
   // Diplay dialogue
-  if (gameState === "talking") {
-    ctx.fillStyle = "rgba(0,0,0,0.8)";
-    ctx.fillRect(20, 240, canvas.width - 40, 70);
-    ctx.fillStyle = "white";
-    ctx.font = "16px monospace";
-    const wrapped = buildLines(
-      ctx,
-      dialogueLines[dialogueIndex],
-      canvas.width - 80,
-    );
-    wrapped.forEach((line, i) => {
-      ctx.fillText(line, 35, 262 + i * 20);
-    });
-  } else if (gameState === "asking") {
-    ctx.fillStyle = "rgba(0,0,0,0.8)";
-    ctx.fillRect(20, 240, canvas.width - 40, 70);
-    ctx.font = "16px monospace";
-    questions.forEach((q, i) => {
-      ctx.fillStyle = visited[i] ? "#888" : "white";
-      const cursor = selectedOption === i ? "> " : "  ";
-      ctx.fillText(cursor + q.q, 35, 265 + i * 20);
-    });
-  } else if (gameState === "answering") {
-    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    ctx.fillRect(20, 240, canvas.width - 40, 70);
-    ctx.fillStyle = "white";
-    ctx.font = "16px monospace";
-    const start = answerPage * 2;
-    answerLines.slice(start, start + 2).forEach((line, i) => {
-      ctx.fillText(line, 35, 265 + i * 20);
-    });
-  }
+  dialogue.draw(ctx, canvas);
 
   inventory.drawPanel(ctx, canvas);
 }
