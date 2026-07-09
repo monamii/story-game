@@ -1,4 +1,4 @@
-import { GameMap } from "./GameMap.js";
+import { GameMap, MapId } from "./GameMap.js";
 
 export class Beach extends GameMap {
   /**
@@ -17,11 +17,11 @@ export class Beach extends GameMap {
    *
    * @param {{x:number}} player
    * @param {HTMLCanvasElement} canvas
-   * @returns {{mapId: number, spawnX: number} | null}
+   * @returns {{mapId: string, spawnX: number} | null}
    */
   checkExit(player, canvas) {
     if (player.x <= 0) {
-      return { mapId: 1, spawnX: canvas.width - 33 };
+      return { mapId: MapId.FOREST, spawnX: canvas.width - 33 };
     }
     return null;
   }

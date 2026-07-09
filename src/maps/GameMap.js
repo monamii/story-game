@@ -1,3 +1,7 @@
+export const MapId = Object.freeze({
+  FOREST: "forest",
+  BEACH: "beach",
+});
 export class GameMap {
   /**
    *
@@ -10,7 +14,7 @@ export class GameMap {
    *
    * @param {{x:number}} player
    * @param {HTMLCanvasElement} canvas
-   * @returns {{mapId: number, spawnX: number} | null}
+   * @returns {{mapId: string, spawnX: number} | null}
    */
   checkExit(player, canvas) {
     return null;
