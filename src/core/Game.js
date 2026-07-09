@@ -1,5 +1,10 @@
+import {
+  hikarigumoDialogue,
+  selectHikarigumoNode,
+} from "../content/hikarigumo.js";
 import { InputManager } from "../core/InputManager.js";
 import { buildLines } from "../core/TextUtils.js";
+import { DialogueRunner } from "../dialogue/DialogueRunner.js";
 import { DialogueSystem } from "../dialogue/DialogueSystem.js";
 import { Item } from "../entities/Item.js";
 import { Npc } from "../entities/Npc.js";
@@ -25,26 +30,8 @@ export class Game {
     this.item = new Item("bag", 80, 200, 16, 16);
     this.inventory = new Inventory();
 
-    this.message = "";
-    this.messageTimer = 0;
-
     /** @type {string} */
     this.currentMap = MapId.FOREST;
-
-    this.questions = [
-      {
-        q: "Who are you?",
-        a: "I am Hikarigumo. I am from the cloud people. We live where the sky turns white and soft. I have never been down here before.",
-      },
-      {
-        q: "Where did you come from?",
-        a: "I fell from up there, past the clouds. There is a town up there — that is where I am from. I was looking over the edge and then... I need to find a way back.",
-      },
-      {
-        q: "Goodbye.",
-        a: "",
-      },
-    ];
 
     this.flags = new StoryFlags();
 
@@ -56,106 +43,48 @@ export class Game {
     this.input = new InputManager();
     this.dialogue = new DialogueSystem();
     this.hud = new HUD();
+
+    this.runner = new DialogueRunner(this.dialogue, this.flags, (text) =>
+      buildLines(this.ctx, text, this.canvas.width - 80),
+    );
   }
 
   update() {
+    this.dialogue.handleInput(this.input);
+
     if (!this.dialogue.isActive()) {
       this.player.update(this.input, this.canvas);
-      const exit = this.maps[this.currentMap].checkExit(
-        this.player,
-        this.canvas,
-      );
-      if (exit) {
-        this.currentMap = exit.mapId;
-        this.player.x = exit.spawnX;
-        if (this.flags.has(StoryFlag.BECAME_COMPANIONS)) {
-          this.npc.x = this.player.x + (exit.mapId === MapId.BEACH ? 10 : -10);
-          this.npc.y = this.player.y;
-        }
-      }
-
-      if (this.input.consumePressed(" ")) {
-        if (this.player.isNear(this.npc)) {
-          if (
-            this.flags.has(StoryFlag.BAG_QUEST_STARTED) &&
-            !this.flags.has(StoryFlag.BECAME_COMPANIONS) &&
-            !this.inventory.has(this.item.id)
-          ) {
-            this.dialogue.startLines(
-              ["Did you find my bag?", "My knee really hurts..."],
-              null,
-            );
-          } else if (
-            this.flags.has(StoryFlag.BAG_QUEST_STARTED) &&
-            !this.flags.has(StoryFlag.BECAME_COMPANIONS) &&
-            this.inventory.has(this.item.id)
-          ) {
-            this.dialogue.startLines(
-              [
-                "That is it! That is my bag!",
-                "Thank you, Bakezaru.",
-                "...",
-                "Bandaid on. There.",
-                "Good as new.",
-                "Hey... do you want to walk together for a while?",
-                "I do not know where I am going. But that is okay.",
-              ],
-              () => {
-                this.flags.set(StoryFlag.BECAME_COMPANIONS);
-              },
-            );
-          } else {
-            this.dialogue.startLines(["..."], () => {
-              this.dialogue.startMenu(this.questions, (i) => {
-                if (i === this.questions.length - 1) {
-                  if (!this.flags.has(StoryFlag.BAG_QUEST_STARTED)) {
-                    this.dialogue.startLines(
-                      [
-                        "Ah...",
-                        "My knee. I hurt it when I landed.",
-                        "I have a bandaid in my bag...",
-                        "...Wait. Where is my bag?",
-                        "I had it when I fell. It must be somewhere on the beach.",
-                        "Bakezaru: I will find it.",
-                      ],
-                      () => {
-                        this.flags.set(StoryFlag.BAG_QUEST_STARTED);
-                      },
-                    );
-                  } else {
-                    this.dialogue.startLines(
-                      [
-                        "You are still looking?",
-                        "Take your time. I am not going anywhere like this.",
-                      ],
-                      null,
-                    );
-                  }
-                } else {
-                  this.dialogue.showAnswer(
-                    buildLines(
-                      this.ctx,
-                      this.questions[i].a,
-                      this.canvas.width - 80,
-                    ),
-                  );
-                }
-              });
-            });
-          }
-        } else if (
-          !this.inventory.has(this.item.id) &&
-          this.player.isNear(this.item, 30)
-        ) {
-          this.inventory.add(this.item);
-          this.hud.showMessage("You found Hikarigumo's bag!", 180);
-        }
-      }
+      this._handleMapTransition();
+      this._handleInteraction();
     }
 
-    this.dialogue.handleInput(this.input);
     this.npc.update(this.player, this.flags.has(StoryFlag.BECAME_COMPANIONS));
     this.hud.update();
+  }
+
+  _handleMapTransition() {
+    const exit = this.maps[this.currentMap].checkExit(this.player, this.canvas);
+    if (!exit) return;
+    this.currentMap = exit.mapId;
+    this.player.x = exit.spawnX;
+    if (this.flags.has(StoryFlag.BECAME_COMPANIONS)) {
+      this.npc.x = this.player.x + (exit.mapId === MapId.BEACH ? 10 : -10);
+      this.npc.y = this.player.y;
+    }
+  }
+
+  _handleInteraction() {
+    if (!this.input.consumePressed(" ")) return;
+    if (this.player.isNear(this.npc)) {
+      const nodeId = selectHikarigumoNode(this.flags, this.inventory);
+      this.runner.start(hikarigumoDialogue, nodeId);
+    } else if (
+      !this.inventory.has(this.item.id) &&
+      this.player.isNear(this.item, 30)
+    ) {
+      this.inventory.add(this.item);
+      this.hud.showMessage("You found Hikarigumo's bag!", 180);
+    }
   }
 
   draw() {

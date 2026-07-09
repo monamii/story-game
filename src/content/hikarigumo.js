@@ -1,4 +1,4 @@
-import { StoryFlag } from "../core/StoryFlags";
+import { StoryFlag } from "../core/StoryFlags.js";
 
 export const hikarigumoDialogue = {
   greeting: {
@@ -20,8 +20,7 @@ export const hikarigumoDialogue = {
       },
       {
         label: "Goodbye.",
-        next: (flags) =>
-          flags.has(StoryFlag.BAG_QUEST_STARTED) ? "goodbyeAgain" : "goodbye",
+        next: "goodbye",
       },
     ],
   },
@@ -37,12 +36,6 @@ export const hikarigumoDialogue = {
     setFlags: [StoryFlag.BAG_QUEST_STARTED],
   },
 
-  goodbyeAgain: {
-    lines: [
-      "You are still looking?",
-      "Take your time. I am not going anywhere like this.",
-    ],
-  },
   bagNotFound: {
     lines: ["Did you find my bag?", "My knee really hurts..."],
   },
