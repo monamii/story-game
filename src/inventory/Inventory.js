@@ -1,14 +1,14 @@
 export class Inventory {
   constructor() {
-    this.itemIds = [];
+    this._items = [];
   }
 
   add(item) {
-    if (!this.has(item.id)) this.itemIds.push(item.id);
+    if (!this.has(item.id)) this._items.push(item);
   }
 
   has(id) {
-    return this.itemIds.includes(id);
+    return this._items.some((item) => item.id === id);
   }
 
   drawPanel(ctx, canvas) {
@@ -18,18 +18,6 @@ export class Inventory {
     ctx.lineWidth = 1;
     ctx.strokeRect(canvas.width - 50, 10, 40, 40);
 
-    if (this.has("bag")) {
-      const bx = canvas.width - 42;
-      const by = 18;
-      ctx.fillStyle = "#8B4513";
-      ctx.fillRect(bx, by, 14, 14);
-      ctx.fillStyle = "#DAA520";
-      ctx.fillRect(bx + 2, by - 3, 10, 4);
-      ctx.fillStyle = "black";
-      ctx.font = "8px monospace";
-      ctx.textAlign = "center";
-      ctx.fillText("BAG", canvas.width - 30, 56);
-      ctx.textAlign = "left";
-    }
+    this._items.forEach((item) => item.drawIcon(ctx, canvas.width - 42, 18));
   }
 }

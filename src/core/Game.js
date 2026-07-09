@@ -60,20 +60,7 @@ export class Game {
 
   update() {
     if (!this.dialogue.isActive()) {
-      if (this.input.isDown("ArrowUp")) this.player.y -= this.player.speed;
-      if (this.input.isDown("ArrowDown")) this.player.y += this.player.speed;
-      if (this.input.isDown("ArrowLeft")) this.player.x -= this.player.speed;
-      if (this.input.isDown("ArrowRight")) this.player.x += this.player.speed;
-
-      this.player.x = Math.max(
-        0,
-        Math.min(this.canvas.width - this.player.width, this.player.x),
-      );
-      this.player.y = Math.max(
-        0,
-        Math.min(this.canvas.height - this.player.height, this.player.y),
-      );
-
+      this.player.update(this.input, this.canvas);
       const exit = this.maps[this.currentMap].checkExit(
         this.player,
         this.canvas,
@@ -167,18 +154,8 @@ export class Game {
     }
 
     this.dialogue.handleInput(this.input);
-
+    this.npc.update(this.player, this.flags.has(StoryFlag.BECAME_COMPANIONS));
     this.hud.update();
-
-    if (this.flags.has(StoryFlag.BECAME_COMPANIONS)) {
-      const dx = this.player.x - this.npc.x;
-      const dy = this.player.y - this.npc.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist > 40) {
-        this.npc.x += dx * 0.05;
-        this.npc.y += dy * 0.05;
-      }
-    }
   }
 
   draw() {
@@ -198,15 +175,7 @@ export class Game {
 
       // Hikarigumo's bag
       if (!this.inventory.has(this.item.id)) {
-        this.ctx.fillStyle = "#8B4513";
-        this.ctx.fillRect(
-          this.item.x,
-          this.item.y,
-          this.item.width,
-          this.item.height,
-        );
-        this.ctx.fillStyle = "#DAA520";
-        this.ctx.fillRect(this.item.x + 3, this.item.y - 3, 10, 4);
+        this.item.drawInWorld(this.ctx);
       }
 
       // Hint above bag
