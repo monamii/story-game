@@ -1,8 +1,13 @@
 export const MapId = Object.freeze({
   FOREST: "forest",
   BEACH: "beach",
+  SHORE: "shore",
 });
 export class GameMap {
+  constructor() {
+    this.npcs = [];
+    this.items = [];
+  }
   /**
    *
    * @param {CanvasRenderingContext2D} ctx

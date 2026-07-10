@@ -23,6 +23,8 @@ export class Beach extends GameMap {
     if (player.x <= 0) {
       return { mapId: MapId.FOREST, spawnX: canvas.width - 33 };
     }
+    if (player.x >= canvas.width - 32)
+      return { mapId: MapId.SHORE, spawnX: 10 };
     return null;
   }
 }

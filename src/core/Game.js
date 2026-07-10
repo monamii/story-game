@@ -13,6 +13,7 @@ import { Inventory } from "../inventory/Inventory.js";
 import { Beach } from "../maps/Beach.js";
 import { Forest } from "../maps/Forest.js";
 import { MapId } from "../maps/GameMap.js";
+import { Shore } from "../maps/Shore.js";
 import { drawBakezaru } from "../sprites/bakezaru.js";
 import { drawHikarigumo } from "../sprites/hikarigumo.js";
 import { HUD } from "./HUD.js";
@@ -38,7 +39,12 @@ export class Game {
     this.maps = {
       [MapId.FOREST]: new Forest(),
       [MapId.BEACH]: new Beach(),
+      [MapId.SHORE]: new Shore(),
     };
+
+    this.npc.drawFn = drawHikarigumo;
+    this.maps[MapId.BEACH].npcs.push(this.npc);
+    this.maps[MapId.SHORE].items.push(this.item);
 
     this.input = new InputManager();
     this.dialogue = new DialogueSystem();
@@ -88,55 +94,45 @@ export class Game {
   }
 
   draw() {
-    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    const { ctx, canvas } = this;
+    const map = this.maps[this.currentMap];
 
-    this.maps[this.currentMap].drawBackground(this.ctx, this.canvas);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    map.drawBackground(ctx, canvas);
+    drawBakezaru(ctx, this.player.x, this.player.y);
 
-    // bakezaru - player
-    drawBakezaru(this.ctx, this.player.x, this.player.y);
+    // Static map NPCs (not yet following)
+    map.npcs.filter((n) => !n.isFollowing).forEach((n) => n.draw(ctx));
 
-    if (
-      this.currentMap === MapId.BEACH ||
-      this.flags.has(StoryFlag.BECAME_COMPANIONS)
-    ) {
-      // hikarigumo
-      drawHikarigumo(this.ctx, this.npc.x, this.npc.y);
+    // Uncollected map items
+    map.items
+      .filter((i) => !this.inventory.has(i.id))
+      .forEach((i) => i.drawInWorld(ctx));
 
-      // Hikarigumo's bag
-      if (!this.inventory.has(this.item.id)) {
-        this.item.drawInWorld(this.ctx);
-      }
+    // Companion follows player across all maps
+    if (this.npc.isFollowing) this.npc.draw(ctx);
 
-      // Hint above bag
-      if (
-        !this.inventory.has(this.item.id) &&
-        !this.dialogue.isActive() &&
-        this.player.isNear(this.item, 30)
-      ) {
-        this.hud.drawHint(
-          this.ctx,
-          this.item.x + this.item.width / 2,
-          this.item.y - 8,
-        );
-      }
+    // NPC hints
+    map.npcs
+      .filter(
+        (n) =>
+          !n.isFollowing && !this.dialogue.isActive() && this.player.isNear(n),
+      )
+      .forEach((n) => this.hud.drawHint(ctx, n.x + n.width / 2, n.y - 10));
 
-      // Hint when near Hikarigumo
-      if (
-        !this.dialogue.isActive() &&
-        !this.flags.has(StoryFlag.BECAME_COMPANIONS) &&
-        this.player.isNear(this.npc)
-      ) {
-        this.hud.drawHint(
-          this.ctx,
-          this.npc.x + this.npc.width / 2,
-          this.npc.y - 10,
-        );
-      }
-    }
+    // Item hints
+    map.items
+      .filter(
+        (i) =>
+          !this.inventory.has(i.id) &&
+          !this.dialogue.isActive() &&
+          this.player.isNear(i, 30),
+      )
+      .forEach((i) => this.hud.drawHint(ctx, i.x + i.width / 2, i.y - 8));
 
-    this.dialogue.draw(this.ctx, this.canvas);
-    this.inventory.drawPanel(this.ctx, this.canvas);
-    this.hud.drawMessage(this.ctx, this.canvas);
+    this.dialogue.draw(ctx, canvas);
+    this.inventory.drawPanel(ctx, canvas);
+    this.hud.drawMessage(ctx, canvas);
   }
 
   start() {
