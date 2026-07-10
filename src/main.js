@@ -1,3 +1,8 @@
 import { Game } from "./core/Game.js";
 
-new Game(document.getElementById("game")).start();
+const game = new Game(document.getElementById("game"));
+game.start();
+
+// Required for running Playwright
+// @ts-ignore
+window.game = game;
