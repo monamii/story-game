@@ -10,18 +10,18 @@ export class GameMap {
   }
   /**
    *
-   * @param {CanvasRenderingContext2D} ctx
-   * @param {HTMLCanvasElement} canvas
+   * @param {CanvasRenderingContext2D} _ctx
+   * @param {HTMLCanvasElement} _canvas
    */
-  drawBackground(ctx, canvas) {}
+  drawBackground(_ctx, _canvas) {}
 
   /**
    *
-   * @param {{x:number}} player
-   * @param {HTMLCanvasElement} canvas
+   * @param {{x:number}} _player
+   * @param {HTMLCanvasElement} _canvas
    * @returns {{mapId: string, spawnX: number} | null}
    */
-  checkExit(player, canvas) {
+  checkExit(_player, _canvas) {
     return null;
   }
 }
