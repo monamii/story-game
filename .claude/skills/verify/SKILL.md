@@ -16,6 +16,7 @@
 
 Drives the full story scenario via headless Playwright (Chromium):
 
+0. Title screen is shown (`_titleScreen === true`); Space exits it and triggers Bakezaru's intro dialogue
 1. Page loads in Forest, no console errors
 2. Navigate Forest → Beach → Shore
 3. Return to Beach, approach Hikarigumo, start dialogue
@@ -23,13 +24,17 @@ Drives the full story scenario via headless Playwright (Chromium):
 5. Navigate to Shore, pick up bag → `inventory.has('bag')` = true
 6. Return to Beach, talk to Hikarigumo → `became_companions` flag set
 7. Walk Forest → Beach → Shore with Hikarigumo following
+8. Return to Forest, approach house → `atHome` dialogue triggers → `arrived_home` flag set → `_ending` = true
 
 ## Key notes
 
 - `window.game` is the debug hook set in `src/main.js` (`window.game = game`)
 - `navigateToMap(key, targetMap)` holds the key and releases the moment `currentMap` matches — prevents zipping through multiple maps
-- `moveNear(getTarget, threshold)` taps keys in both axes toward target center
-- `advanceUntilDone(maxPresses)` presses Space only while `dialogue.isActive()` — stops immediately to prevent re-triggering greeting after dialogue ends
+- `moveNear(getTarget, threshold)` taps keys in both axes toward target center (max 200 iterations)
+- `advanceUntilDone(maxPresses)` presses Space only while `dialogue.isActive()` — stops immediately to prevent re-triggering
 - All `window.game` errors in IDE are false positives (browser context inside `page.evaluate`)
-- Player speed = 3px/frame; NPC at (340, 230); item (bag) at (80, 200); player spawns at y=30
+- Game properties: `window.game.hikarigumo` (NPC), `window.game.bag` (item), `window.game.player`, `window.game.flags`, `window.game.inventory`
+- Player speed = 3px/frame; hikarigumo at (340, 230); bag at (300, 200); player spawns at y=30
+- House center: (75, 175) — interaction threshold 40px; Forest only
+- Title screen: `window.game._titleScreen`; ending screen: `window.game._ending`
 - Playwright must be installed: `npm install -D playwright` (already in devDependencies)

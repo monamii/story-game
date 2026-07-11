@@ -52,7 +52,7 @@ async function navigateToMap(key, targetMap) {
 
 // Move player toward target using both axes, tap key by key
 async function moveNear(getTarget, threshold = 35) {
-  for (let i = 0; i < 120; i++) {
+  for (let i = 0; i < 200; i++) {
     const state = await page.evaluate(() => {
       const g = window.game;
       if (!g) return null;
@@ -96,20 +96,32 @@ async function advanceUntilDone(maxPresses = 15) {
 async function getNpcCenter() {
   return page.evaluate(() => {
     const g = window.game;
-    if (!g) return null;
-    return { cx: g.npc.x + g.npc.width / 2, cy: g.npc.y + g.npc.height / 2 };
+    if (!g || !g.hikarigumo) return null;
+    return { cx: g.hikarigumo.x + g.hikarigumo.width / 2, cy: g.hikarigumo.y + g.hikarigumo.height / 2 };
   });
 }
 
 async function getItemCenter() {
   return page.evaluate(() => {
     const g = window.game;
-    if (!g) return null;
-    return { cx: g.item.x + g.item.width / 2, cy: g.item.y + g.item.height / 2 };
+    if (!g || !g.bag) return null;
+    return { cx: g.bag.x + g.bag.width / 2, cy: g.bag.y + g.bag.height / 2 };
   });
 }
 
-// --- Step 1: page loads ---
+const getHouseCenter = () => Promise.resolve({ cx: 75, cy: 175 });
+
+// --- Step 0: title screen ---
+await page.screenshot({ path: join(OUT_DIR, 'step0_title.png') });
+const titleScreen = await page.evaluate(() => window.game?._titleScreen);
+check('Step0 title screen active', titleScreen, true);
+
+// Exit title and advance Bakezaru intro dialogue
+await page.keyboard.press('Space');
+await page.waitForTimeout(400);
+await advanceUntilDone(4);
+
+// --- Step 1: page loads in Forest ---
 await page.screenshot({ path: join(OUT_DIR, 'step1_load.png') });
 const step1Map = await page.evaluate(() => window.game?.currentMap);
 check('Step1 initial map', step1Map, 'forest');
@@ -122,14 +134,14 @@ await navigateToMap('ArrowRight', 'shore');
 await page.screenshot({ path: join(OUT_DIR, 'step2_shore.png') });
 check('Step2 arrived at shore', await page.evaluate(() => window.game?.currentMap), 'shore');
 
-// --- Step 3: Shore → Beach, approach NPC (x=340 y=230), start dialogue ---
+// --- Step 3: Shore → Beach, approach NPC, start dialogue ---
 await navigateToMap('ArrowLeft', 'beach');
 
 await moveNear(getNpcCenter, 35);
 const distToNpc = await page.evaluate(() => {
   const g = window.game;
-  const dx = (g.player.x + 16) - (g.npc.x + 16);
-  const dy = (g.player.y + 16) - (g.npc.y + 16);
+  const dx = (g.player.x + 16) - (g.hikarigumo.x + 16);
+  const dy = (g.player.y + 16) - (g.hikarigumo.y + 16);
   return Math.round(Math.sqrt(dx * dx + dy * dy));
 });
 console.log(`   dist to NPC: ${distToNpc} (threshold 40)`);
@@ -140,11 +152,10 @@ const dialogueActive = await page.evaluate(() => window.game?.dialogue?.isActive
 await page.screenshot({ path: join(OUT_DIR, 'step3_dialogue_start.png') });
 check('Step3 dialogue active', dialogueActive, true);
 
-// Advance past greeting ("...") → choices menu
-await advanceUntilDone(3);
+await advanceUntilDone(1);
 const stateAtChoices = await page.evaluate(() => window.game?.dialogue?._state);
 await page.screenshot({ path: join(OUT_DIR, 'step3_choices.png') });
-check('Step3 dialogue state', stateAtChoices, 'answering');
+check('Step3 dialogue state', stateAtChoices, 'asking');
 
 // --- Step 4: Choose "Goodbye." (index 2) ---
 await page.keyboard.press('ArrowDown');
@@ -167,14 +178,14 @@ await page.screenshot({ path: join(OUT_DIR, 'step4_talk_again.png') });
 check('Step4 talk again active', talkAgainActive, true);
 await advanceUntilDone(4);
 
-// --- Step 5: Beach → Shore, pick up bag (x=80 y=200) ---
+// --- Step 5: Beach → Shore, pick up bag ---
 await navigateToMap('ArrowRight', 'shore');
 
 await moveNear(getItemCenter, 25);
 const distToBag = await page.evaluate(() => {
   const g = window.game;
-  const dx = (g.player.x + 16) - (g.item.x + 8);
-  const dy = (g.player.y + 16) - (g.item.y + 8);
+  const dx = (g.player.x + 16) - (g.bag.x + 8);
+  const dy = (g.player.y + 16) - (g.bag.y + 8);
   return Math.round(Math.sqrt(dx * dx + dy * dy));
 });
 console.log(`   dist to bag: ${distToBag} (threshold 30)`);
@@ -195,22 +206,50 @@ const bagFoundActive = await page.evaluate(() => window.game?.dialogue?.isActive
 await page.screenshot({ path: join(OUT_DIR, 'step6_bag_found_start.png') });
 check('Step6 bagFound dialogue active', bagFoundActive, true);
 
-await advanceUntilDone(10);
+await advanceUntilDone(12);
 const becameCompanions = await page.evaluate(() => window.game?.flags?.has('became_companions'));
 await page.screenshot({ path: join(OUT_DIR, 'step6_companions.png') });
 check('Step6 became_companions', becameCompanions, true);
 
 // --- Step 7: Walk all maps with Hikarigumo ---
 await navigateToMap('ArrowLeft', 'forest');
-const forestFollowing = await page.evaluate(() => window.game?.npc?.isFollowing);
+const forestFollowing = await page.evaluate(() => window.game?.hikarigumo?.isFollowing);
 await page.screenshot({ path: join(OUT_DIR, 'step7_forest.png') });
 check('Step7 forest npc following', forestFollowing, true);
 
 await navigateToMap('ArrowRight', 'beach');
 await navigateToMap('ArrowRight', 'shore');
-const shoreFollowing = await page.evaluate(() => window.game?.npc?.isFollowing);
+const shoreFollowing = await page.evaluate(() => window.game?.hikarigumo?.isFollowing);
 await page.screenshot({ path: join(OUT_DIR, 'step7_shore.png') });
 check('Step7 shore npc following', shoreFollowing, true);
+
+// --- Step 8: Return to Forest, go to house, trigger ending ---
+await navigateToMap('ArrowLeft', 'beach');
+await navigateToMap('ArrowLeft', 'forest');
+
+await moveNear(getHouseCenter, 32);
+const distToHouse = await page.evaluate(() => {
+  const g = window.game;
+  const dx = (g.player.x + 16) - 75;
+  const dy = (g.player.y + 16) - 175;
+  return Math.round(Math.sqrt(dx * dx + dy * dy));
+});
+console.log(`   dist to house: ${distToHouse} (threshold 40)`);
+await page.screenshot({ path: join(OUT_DIR, 'step8_near_house.png') });
+
+await page.keyboard.press('Space');
+await page.waitForTimeout(600);
+const atHomeActive = await page.evaluate(() => window.game?.dialogue?.isActive());
+check('Step8 atHome dialogue active', atHomeActive, true);
+
+await advanceUntilDone(5);
+await page.waitForTimeout(500);
+
+const arrivedHome = await page.evaluate(() => window.game?.flags?.has('arrived_home'));
+const isEnding = await page.evaluate(() => window.game?._ending);
+await page.screenshot({ path: join(OUT_DIR, 'step8_ending.png') });
+check('Step8 arrived_home flag', arrivedHome, true);
+check('Step8 ending screen', isEnding, true);
 
 check('No console errors', consoleErrors.length, 0);
 if (consoleErrors.length) console.log('  errors:', JSON.stringify(consoleErrors));

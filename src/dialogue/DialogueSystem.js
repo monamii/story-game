@@ -8,7 +8,8 @@ export const DialogueState = Object.freeze({
 });
 export class DialogueSystem {
   constructor() {
-    this._state = DialogueState.IDLE; // idle, talking, asking, answering
+    /** @type {string} */
+    this._state = DialogueState.IDLE;
     this._lines = [];
     this._index = 0;
     this._onComplete = null;
@@ -47,6 +48,8 @@ export class DialogueSystem {
 
   handleInput(input) {
     if (this._state === DialogueState.TALKING) {
+      input.consumePressed("ArrowUp");
+      input.consumePressed("ArrowDown");
       if (input.consumePressed(" ")) {
         if (this._index < this._lines.length - 1) {
           this._index++;
@@ -84,6 +87,7 @@ export class DialogueSystem {
       return;
     }
 
+    ctx.textAlign = "left";
     ctx.fillStyle = "rgba(0,0,0,0.8)";
     ctx.fillRect(20, 240, canvas.width - 40, 70);
 
