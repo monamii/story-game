@@ -9,4 +9,4 @@ A short story game about a chance meeting on the beach.
 
 ## Play
 
-*URL coming soon.*
+https://monamii.github.io/story-game/
